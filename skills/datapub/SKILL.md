@@ -19,6 +19,45 @@ Data safety问卷所有勾选/输入，在走完5步问卷到底之前，都是�
 状态。**重新打开这个页面的URL会回到第1步/清空输入**，不会有任何警告。
 填到一半要临时切走，先确认已经保存过。
 
+## 陷阱0（血泪教训）：步骤3 Data types真的会整体丢失，且症状会骗过"重载
+不丢数据"的旧经验
+
+**实测发生过一次真实数据丢失**：前一次会话已经把Data types的4个数据类型
+（Name/Email/Purchase history/Voice recordings/Other user-generated
+content）全部勾好、Data usage and handling的4个对话框也全部填成
+Completed、Preview页也显示过"Change saved"——但重新打开页面后，步骤3
+所有大类的"X/Y data types selected"计数器全部变回`0`，实际展开检查
+`checked=false`，**是真丢了，不是显示假象**。同一时间步骤2
+（Data collection and security）的内容完好无损，说明不是整份问卷重置，
+只是步骤3这一步的持久化出了问题。
+
+怀疑根因（未最终定位，留给下次复现时验证）：当时CDP连接的Chrome里同时
+开着多个指向同一个Data safety URL的tab（`tab list`能看到两个甚至更多
+重复URL的tab）。步骤3的checkbox操作可能命中了跟最终"Save"/翻页操作不是
+同一个tab的DOM，导致视觉上看着勾上了、Preview也生成了摘要，但服务器
+那边实际收到的保存请求来自另一个从未真正勾选过的tab副本。**操作前先
+`tab list`确认只有一个目标tab，可疑时关掉多余的重复tab**，是目前唯一
+能想到的预防措施。
+
+**真正可靠的持久化验证方法（别再信"Change saved"提示或Preview摘要）**：
+1. 填完关键步骤后，用`eval "location.reload()"`**强制刷新**（不是重开
+   URL，效果一样但更快触发）。
+2. 刷新后wizard会回到"Step 1 of 5"的可见步骤（这是陷阱12说的正常表现，
+   不代表数据丢了），依次点Next走到目标步骤。
+3. 到目标步骤后，展开每个分类/打开每个dialog，直接读`checked`属性核实
+   ——不要只看外层"X/Y data types selected"计数器文案（这个计数器本身
+   有时会在切换到别的分类后短暂不渲染，属于UI噪音，不是数据状态的
+   权威来源，展开分类看真实checkbox状态才是权威来源）。
+
+**"Save draft"选项能真正持久化，已用刷新测试验证过**：右下角"More
+options"（三个点，⋮）菜单里有个"Back / Save draft / Discard changes"，
+点"Save draft"后会出现"Your changes have been saved"提示，这次经强制
+刷新+走查checkbox状态验证过是真实持久化的（不只是Save draft这一次，
+后续在Preview页正常走完5步保存也一样真实持久化了）。**建议策略**：不用
+每填一小步就验证一次（太慢），但整个问卷走完后、宣布"完成"之前，至少
+做一次完整的强制刷新+逐项核对，作为最终确认，而不是仅凭页面提示或
+Preview摘要文案就下结论。
+
 ## 5步流程
 
 Overview → Data collection and security → Data types → Data usage and
@@ -255,6 +294,36 @@ Target audience相关的红色提示。所以完整的判断顺序是：先用�
 **"送审"（Publishing overview页点"Submit changes for review"）是完全
 独立于"填完问卷"的下一步，且通常属于用户自己拍板的范围，不要因为想
 "彻底完成"就顺手点了它。**
+
+### 陷阱8：右下角"More options"菜单弹出过一次之后，会跟"Open X
+questions"/"Show content: X"按钮抢占相同的ref编号
+
+打开过一次右下角"⋮ More options"菜单（Back/Save draft/Discard changes）
+之后，哪怕菜单看起来已经收起，再对之前记下的"Open X questions"按钮ref
+（比如`e64`）执行`click`，命中的可能不是那个按钮，而是菜单里"Save
+draft"这个菜单项——因为菜单弹出会在accessibility树里插入新节点，把原来
+按钮的ref编号顶替掉，点击"成功"（`✓ Done`）却没有打开目标dialog，而是
+悄悄点了"Save draft"（后果不严重但会打乱操作节奏，容易被当成"点击没
+反应"来回重试）。
+
+**排查信号**：点了"Open X questions"之后截图，发现停在原页面、右下角
+弹出"Back / Save draft / Discard changes"三项菜单，而不是预期的dialog。
+
+**修复**：
+1. 先`eval "document.body.click(); 'closed'"`点击页面空白处关掉残留菜单。
+2. 不要复用旧ref，改用`eval`按精确`aria-label`文案 + `offsetParent !==
+   null`过滤重新定位再点击（同陷阱4的兜底写法）：
+   ```
+   eval "(() => { const btns = Array.from(document.querySelectorAll('button'))
+   .filter(b => (b.getAttribute('aria-label')||'') === '<精确文案，如
+   Open Voice or sound recordings questions>' && b.offsetParent !== null);
+   if (btns.length !== 1) return 'AMBIGUOUS:' + btns.length; btns[0].click();
+   return 'clicked'; })()"
+   ```
+   这个页面对同一个`aria-label`经常能匹配到2个DOM节点（跟`assetpub`
+   skill记录的"App icon/Phone screenshots共享同一个Add assets文字"是
+   同一类响应式布局重复渲染问题），`offsetParent !== null`过滤出可见的
+   那一个，`length !== 1`时先别点，返回数量自己排查，不要盲猜点第一个。
 
 ## 相关
 
