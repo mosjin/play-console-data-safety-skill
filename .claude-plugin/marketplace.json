@@ -1,0 +1,15 @@
+{
+  "name": "play-console-data-safety",
+  "owner": {
+    "name": "mosjin",
+    "url": "https://github.com/mosjin/play-console-data-safety-skill"
+  },
+  "description": "填写Google Play Console的Data safety问卷（5步），含实测踩过的坑：Delete account URL/Delete data URL易混淆、Data types据实申报原则。",
+  "plugins": [
+    {
+      "name": "datapub",
+      "source": "./",
+      "description": "Play Console Data safety问卷5步填写流程和实测坑。"
+    }
+  ]
+}

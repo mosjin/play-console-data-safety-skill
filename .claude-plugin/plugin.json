@@ -1,0 +1,10 @@
+{
+  "name": "datapub",
+  "description": "填写Google Play Console的Data safety问卷5步流程，含实测踩过的坑。通用skill，不绑定任何具体项目。",
+  "version": "1.0.0",
+  "author": {
+    "name": "mosjin",
+    "url": "https://github.com/mosjin"
+  },
+  "homepage": "https://github.com/mosjin/play-console-data-safety-skill"
+}
